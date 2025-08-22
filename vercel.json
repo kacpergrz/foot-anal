@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/get-matches",
+      "dest": "/api/get_matches.py",
+      "headers": {
+        "Cache-Control": "s-maxage=3600, stale-while-revalidate=60"
+      }
+    },
+    {
+      "src": "/api/analyze",
+      "dest": "/api/analyze.py"
+    }
+  ]
+}

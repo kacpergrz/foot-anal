@@ -8,6 +8,10 @@
   ],
   "routes": [
     {
+      "src": "/",
+      "dest": "/foot_anal.html"
+    },
+    {
       "src": "/api/get-matches",
       "dest": "/api/get_matches.py",
       "headers": {
@@ -17,6 +21,6 @@
     {
       "src": "/api/analyze",
       "dest": "/api/analyze.py"
-    }
+    } 
   ]
 }

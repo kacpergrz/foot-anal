@@ -86,15 +86,22 @@ def get_matches():
 
 # --- Logika z analyze.py (bez zmian) ---
 def _call_gemini_api(prompt, api_key):
-    api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2-5:generateContent?key={api_key}"
+    # Poprawiony URL - używamy stabilnego modelu gemini-pro i zalecanego endpointu v1beta
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
     payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
     response = requests.post(api_url, json=payload, headers={'Content-Type': 'application/json'})
     response.raise_for_status()
     data = response.json()
+
+    # Czasami API zwraca status 200 OK, ale z błędem w treści
+    if 'error' in data:
+        raise Exception(f"Błąd API Gemini: {data['error'].get('message', 'Nieznany błąd')}")
+
     if "candidates" in data and len(data["candidates"]) > 0:
         return data
     else:
-        raise Exception(f"API nie zwróciło kandydatów. Powód: {data.get('promptFeedback', {}).get('blockReason', 'Nieznany')}")
+        feedback = data.get('promptFeedback', {})
+        raise Exception(f"API nie zwróciło kandydatów. Powód: {feedback.get('blockReason', 'Nieznany')}. {feedback.get('blockReasonMessage', '')}".strip())
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():

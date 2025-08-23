@@ -86,7 +86,7 @@ def get_matches():
 
 # --- Logika z analyze.py (bez zmian) ---
 def _call_gemini_api(prompt, api_key):
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+    api_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2-5:generateContent?key={api_key}"
     payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
     response = requests.post(api_url, json=payload, headers={'Content-Type': 'application/json'})
     response.raise_for_status()

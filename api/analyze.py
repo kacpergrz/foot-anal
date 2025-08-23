@@ -26,15 +26,28 @@ class handler(BaseHTTPRequestHandler):
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
             self.end_headers()
             self.wfile.write(json.dumps(gemini_response, ensure_ascii=False).encode('utf-8'))
 
         except Exception as e:
             self._send_error_response(500, f"Błąd po stronie serwera: {e}")
 
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
     def _send_error_response(self, code, message):
         self.send_response(code)
         self.send_header('Content-type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
         self.wfile.write(json.dumps({'error': message}, ensure_ascii=False).encode('utf-8'))
 

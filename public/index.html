@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizator Meczów AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .modal-bg {
+            background: rgba(0, 0, 0, 0.7);
+        }
+        .loader {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white antialiased">
+    <div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+        <!-- Header -->
+        <header class="glass-effect border-b border-gray-700">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <h1 class="text-2xl font-bold text-white">⚽ Analizator Meczów AI</h1>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button id="settingsBtn" class="glass-effect px-4 py-2 rounded-lg hover:bg-white hover:bg-opacity-10 transition-all duration-200">
+                            ⚙️ Ustawienia
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Status Bar -->
+            <div class="glass-effect rounded-lg p-4 mb-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div id="statusIndicator" class="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                        <span id="statusText" class="text-sm text-gray-300">Ładowanie meczów...</span>
+                    </div>
+                    <button id="refreshBtn" class="glass-effect px-3 py-1 rounded text-sm hover:bg-white hover:bg-opacity-10 transition-all duration-200">
+                        🔄 Odśwież
+                    </button>
+                </div>
+            </div>
+
+            <!-- Matches Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Today's Matches -->
+                <div class="glass-effect rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        📅 Dzisiejsze mecze
+                        <span id="matchCount" class="ml-2 text-sm text-gray-400"></span>
+                    </h2>
+                    <div id="matchesList" class="space-y-3">
+                        <!-- Matches will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Analysis Panel -->
+                <div class="glass-effect rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">🤖 Analiza AI</h2>
+                    <div id="analysisPanel">
+                        <p class="text-gray-400 text-center py-8">Wybierz mecz, aby uzyskać analizę AI</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 modal-bg hidden items-center justify-center z-50">
+        <div class="glass-effect rounded-lg p-6 max-w-md w-full mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Ustawienia API</h3>
+                <button id="closeModal" class="text-gray-400 hover:text-white">✕</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Klucz API Gemini</label>
+                    <input type="password" id="apiKeyInput" placeholder="Wprowadź klucz API..." 
+                           class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <p class="text-xs text-gray-400 mt-1">Potrzebny do analizy AI. Uzyskaj na: <a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-blue-400">Google AI Studio</a></p>
+                </div>
+                <div class="flex space-x-3">
+                    <button id="saveSettings" class="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">
+                        Zapisz
+                    </button>
+                    <button id="cancelSettings" class="flex-1 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors">
+                        Anuluj
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let matches = [];
+        let apiKey = localStorage.getItem('geminiApiKey') || '';
+        const converter = new showdown.Converter();
+
+        // DOM elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const matchesList = document.getElementById('matchesList');
+        const matchCount = document.getElementById('matchCount');
+        const analysisPanel = document.getElementById('analysisPanel');
+        const settingsModal = document.getElementById('settingsModal');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+
+        // Event listeners
+        document.getElementById('refreshBtn').addEventListener('click', loadMatches);
+        document.getElementById('settingsBtn').addEventListener('click', openSettings);
+        document.getElementById('closeModal').addEventListener('click', closeSettings);
+        document.getElementById('cancelSettings').addEventListener('click', closeSettings);
+        document.getElementById('saveSettings').addEventListener('click', saveSettings);
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMatches();
+            if (!apiKey) {
+                setTimeout(openSettings, 1000);
+            }
+        });
+
+        // Functions
+        async function loadMatches() {
+            updateStatus('loading', 'Ładowanie meczów...');
+            
+            try {
+                const response = await fetch('/api/get-matches');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                matches = await response.json();
+                displayMatches();
+                updateStatus('success', `Załadowano ${matches.length} meczów`);
+            } catch (error) {
+                console.error('Error loading matches:', error);
+                updateStatus('error', 'Błąd ładowania meczów');
+                matchesList.innerHTML = '<p class="text-red-400 text-center">Nie udało się załadować meczów</p>';
+            }
+        }
+
+        function displayMatches() {
+            if (matches.length === 0) {
+                matchesList.innerHTML = '<p class="text-gray-400 text-center">Brak meczów na dziś</p>';
+                matchCount.textContent = '(0)';
+                return;
+            }
+
+            matchCount.textContent = `(${matches.length})`;
+            
+            matchesList.innerHTML = matches.map((match, index) => `
+                <div class="bg-gray-800 bg-opacity-50 rounded-lg p-4 hover:bg-opacity-70 transition-all cursor-pointer" 
+                     onclick="analyzeMatch(${index})">
+                    <div class="flex justify-between items-center">
+                        <div class="flex-1">
+                            <div class="font-medium">${match.home_team} vs ${match.away_team}</div>
+                            <div class="text-sm text-gray-400">${match.league}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-400">${formatDate(match.date)}</div>
+                            <div class="text-xs text-blue-400">${match.source}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function analyzeMatch(index) {
+            if (!apiKey) {
+                openSettings();
+                return;
+            }
+
+            const match = matches[index];
+            analysisPanel.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="loader w-8 h-8 border-4 border-gray-600 rounded-full mx-auto mb-4"></div>
+                    <p class="text-gray-400">Analizuję mecz ${match.home_team} vs ${match.away_team}...</p>
+                </div>
+            `;
+
+            const prompt = `Przeanalizuj mecz piłki nożnej: ${match.home_team} vs ${match.away_team} w lidze ${match.league}. 
+            Podaj krótką analizę (max 300 słów) zawierającą:
+            1. Przewidywany wynik
+            2. Kluczowych graczy do obserwowania
+            3. Taktyczne aspekty
+            4. Czynniki mogące wpłynąć na wynik
+            
+            Odpowiedz w języku polskim w formacie markdown.`;
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, apiKey })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Błąd API');
+                }
+
+                const data = await response.json();
+                const analysisText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Brak analizy';
+                const htmlContent = converter.makeHtml(analysisText);
+                
+                analysisPanel.innerHTML = `
+                    <div class="prose prose-invert max-w-none">
+                        <h3 class="text-lg font-semibold mb-3">${match.home_team} vs ${match.away_team}</h3>
+                        ${htmlContent}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Analysis error:', error);
+                analysisPanel.innerHTML = `
+                    <div class="text-red-400 text-center py-8">
+                        <p>Błąd analizy: ${error.message}</p>
+                        <button onclick="analyzeMatch(${index})" class="mt-2 text-blue-400 hover:text-blue-300">
+                            Spróbuj ponownie
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function updateStatus(type, message) {
+            statusText.textContent = message;
+            statusIndicator.className = `w-3 h-3 rounded-full ${
+                type === 'loading' ? 'bg-yellow-500 animate-pulse' :
+                type === 'success' ? 'bg-green-500' :
+                'bg-red-500'
+            }`;
+        }
+
+        function formatDate(dateString) {
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleTimeString('pl-PL', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            } catch {
+                return 'N/A';
+            }
+        }
+
+        function openSettings() {
+            apiKeyInput.value = apiKey;
+            settingsModal.classList.remove('hidden');
+            settingsModal.classList.add('flex');
+        }
+
+        function closeSettings() {
+            settingsModal.classList.add('hidden');
+            settingsModal.classList.remove('flex');
+        }
+
+        function saveSettings() {
+            const newApiKey = apiKeyInput.value.trim();
+            if (newApiKey) {
+                apiKey = newApiKey;
+                localStorage.setItem('geminiApiKey', apiKey);
+            }
+            closeSettings();
+        }
+
+        // Close modal on outside click
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) closeSettings();
+        });
+    </script>
+</body>
+</html>

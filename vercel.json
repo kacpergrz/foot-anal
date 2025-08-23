@@ -1,12 +1,11 @@
 {
-  "functions": {
-    "api/get_matches.py": {
-      "runtime": "python3.12"
-    },
-    "api/analyze.py": {
-      "runtime": "python3.12"
+  "builds": [
+    {
+      "src": "api/*.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.12" }
     }
-  },
+  ],
   "rewrites": [
     {
       "source": "/api/get-matches",

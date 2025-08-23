@@ -3,3 +3,5 @@ beautifulsoup4
 Flask
 Flask-Cors
 python-dotenv
+google-generativeai
+google-api-core

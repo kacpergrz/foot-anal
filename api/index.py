@@ -4,16 +4,31 @@ import os
 import requests
 from datetime import date, datetime
 import json
-import google.generativeai as genai
-from google.api_core import exceptions as google_exceptions
-from google.generativeai.types import generation_types
+try:
+    import google.generativeai as genai
+    from google.api_core import exceptions as google_exceptions
+    from google.generativeai.types import generation_types
+    GOOGLE_AI_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Google AI libraries not available: {e}")
+    GOOGLE_AI_AVAILABLE = False
+    # Fallback classes for error handling
+    class MockGoogleExceptions:
+        PermissionDenied = Exception
+        NotFound = Exception
+        InvalidArgument = Exception
+    google_exceptions = MockGoogleExceptions()
+    
+    class MockGenerationTypes:
+        class BlockedPromptException(Exception):
+            pass
+    generation_types = MockGenerationTypes()
 from dotenv import load_dotenv
 load_dotenv()
 
 # --- Konfiguracja Aplikacji Flask ---
-# Vercel umieszcza pliki statyczne (jak index.html) w folderze /tmp
-# Musimy mu wskazać poprawną ścieżkę
-template_dir = os.path.abspath('./api')
+# Konfiguracja dla Vercel
+template_dir = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, template_folder=template_dir)
 CORS(app)
 
@@ -114,6 +129,10 @@ def _call_gemini_api(prompt, api_key):
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
+    # Sprawdź czy Google AI jest dostępne
+    if not GOOGLE_AI_AVAILABLE:
+        return jsonify({"error": "Google AI libraries are not available. Please check server configuration."}), 503
+    
     body = request.get_json()
     if not body:
         return jsonify({'error': 'Brak danych w zapytaniu.'}), 400
@@ -136,6 +155,15 @@ def analyze():
         return jsonify({"error": f"Twoje zapytanie zostało zablokowane przez API. {e}"}), 400
     except Exception as e:
         return jsonify({"error": f"Wystąpił nieoczekiwany błąd serwera: {e}"}), 500
+
+# --- Dodaj handler dla błędów ---
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found'}), 404
 
 # --- Blok do uruchamiania serwera deweloperskiego ---
 if __name__ == '__main__':

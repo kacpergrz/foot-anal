@@ -4,6 +4,11 @@ import os
 import requests
 from datetime import date, datetime
 import json
+import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
+from google.generativeai.types import generation_types
+from dotenv import load_dotenv
+load_dotenv()
 
 # --- Konfiguracja Aplikacji Flask ---
 # Vercel umieszcza pliki statyczne (jak index.html) w folderze /tmp
@@ -65,6 +70,8 @@ def get_matches():
         apis_with_key = {
             'Premier League': 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED',
             'La Liga': 'https://api.football-data.org/v4/competitions/PD/matches?status=SCHEDULED',
+            'Serie A': 'https://api.football-data.org/v4/competitions/SA/matches?status=SCHEDULED',
+            'Bundesliga': 'https://api.football-data.org/v4/competitions/BL1/matches?status=SCHEDULED',
         }
         headers = {'X-Auth-Token': FOOTBALL_DATA_API_KEY}
         for league_name, api_url in apis_with_key.items():
@@ -74,7 +81,7 @@ def get_matches():
                 all_matches.extend(_parse_footballdata_org_response(response.json(), league_name))
             except Exception as e:
                 print(f"Error fetching {league_name}: {e}")
-    apis_no_key = { 'Bundesliga': f"https://api.openligadb.de/getmatchdata/bl1/{date.today().year}" }
+    apis_no_key = {}
     for league_name, api_url in apis_no_key.items():
         try:
             response = session.get(api_url)
@@ -86,22 +93,24 @@ def get_matches():
 
 # --- Logika z analyze.py (bez zmian) ---
 def _call_gemini_api(prompt, api_key):
-    # Poprawiony URL - używamy stabilnego modelu gemini-pro i zalecanego endpointu v1beta
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
-    payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
-    response = requests.post(api_url, json=payload, headers={'Content-Type': 'application/json'})
-    response.raise_for_status()
-    data = response.json()
+    """Komunikuje się z API Gemini używając oficjalnej biblioteki Google."""
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash') # Poprawiona nazwa modelu na 'gemini-1.5-flash'
+        response = model.generate_content(prompt)
 
-    # Czasami API zwraca status 200 OK, ale z błędem w treści
-    if 'error' in data:
-        raise Exception(f"Błąd API Gemini: {data['error'].get('message', 'Nieznany błąd')}")
+        # Sprawdzamy, czy odpowiedź nie została zablokowana
+        if not response.candidates:
+            reason = response.prompt_feedback.block_reason.name if response.prompt_feedback.block_reason else "Nieznany"
+            raise generation_types.BlockedPromptException(f"API nie zwróciło odpowiedzi. Powód blokady: {reason}")
 
-    if "candidates" in data and len(data["candidates"]) > 0:
-        return data
-    else:
-        feedback = data.get('promptFeedback', {})
-        raise Exception(f"API nie zwróciło kandydatów. Powód: {feedback.get('blockReason', 'Nieznany')}. {feedback.get('blockReasonMessage', '')}".strip())
+        # Zwracamy odpowiedź w formacie, którego oczekuje frontend
+        # (naśladując strukturę JSON z oryginalnego API REST)
+        return {"candidates": [{"content": {"parts": [{"text": response.text}]}}]}
+
+    except ValueError as e:
+        # Biblioteka rzuca ValueError, gdy nie może wyodrębnić .text (np. zablokowany prompt)
+        raise generation_types.BlockedPromptException(f"Odpowiedź zablokowana lub pusta. {e}")
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
@@ -117,5 +126,19 @@ def analyze():
     try:
         gemini_response = _call_gemini_api(prompt, user_api_key)
         return jsonify(gemini_response)
+    except google_exceptions.PermissionDenied:
+        return jsonify({"error": "Błąd API Gemini: Nieprawidłowy klucz API lub brak uprawnień."}), 403
+    except google_exceptions.NotFound as e:
+        return jsonify({"error": f"Błąd API Gemini: Nie znaleziono zasobu (np. modelu). Sprawdź poprawność nazwy. Szczegóły: {e}"}), 404
+    except google_exceptions.InvalidArgument:
+         return jsonify({"error": "Błąd API Gemini: Nieprawidłowy argument, sprawdź poprawność promptu."}), 400
+    except generation_types.BlockedPromptException as e:
+        return jsonify({"error": f"Twoje zapytanie zostało zablokowane przez API. {e}"}), 400
     except Exception as e:
-        return jsonify({"error": f"Błąd po stronie serwera: {e}"}), 500
+        return jsonify({"error": f"Wystąpił nieoczekiwany błąd serwera: {e}"}), 500
+
+# --- Blok do uruchamiania serwera deweloperskiego ---
+if __name__ == '__main__':
+    # Uruchamia wbudowany serwer Flask, idealny do lokalnego dewelopmentu.
+    # debug=True sprawi, że serwer będzie się automatycznie restartował po każdej zmianie w kodzie.
+    app.run(debug=True, port=5001)

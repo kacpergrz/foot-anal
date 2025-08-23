@@ -1,0 +1,138 @@
+[
+  {
+    "league": "2. Bundesliga",
+    "date": "2025-08-23T13:00:00",
+    "home_team": "SC Paderborn 07",
+    "away_team": "Fortuna Düsseldorf",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "2. Bundesliga",
+    "date": "2025-08-23T13:00:00",
+    "home_team": "Karlsruher SC",
+    "away_team": "Eintracht Braunschweig",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "2. Bundesliga",
+    "date": "2025-08-23T13:00:00",
+    "home_team": "Hannover 96",
+    "away_team": "1. FC Magdeburg",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "2. Bundesliga",
+    "date": "2025-08-23T20:30:00",
+    "home_team": "FC Schalke 04",
+    "away_team": "VfL Bochum",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "Bundesliga",
+    "date": "2025-08-23T15:30:00",
+    "home_team": "Bayer 04 Leverkusen",
+    "away_team": "TSG Hoffenheim",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "Bundesliga",
+    "date": "2025-08-23T15:30:00",
+    "home_team": "Eintracht Frankfurt",
+    "away_team": "SV Werder Bremen",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "Bundesliga",
+    "date": "2025-08-23T15:30:00",
+    "home_team": "SC Freiburg",
+    "away_team": "FC Augsburg",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "Bundesliga",
+    "date": "2025-08-23T15:30:00",
+    "home_team": "1. FC Union Berlin",
+    "away_team": "VfB Stuttgart",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "Bundesliga",
+    "date": "2025-08-23T15:30:00",
+    "home_team": "1. FC Heidenheim 1846",
+    "away_team": "VfL Wolfsburg",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "Bundesliga",
+    "date": "2025-08-23T18:30:00",
+    "home_team": "FC St. Pauli",
+    "away_team": "Borussia Dortmund",
+    "status": "Scheduled",
+    "source": "OpenLigaDB"
+  },
+  {
+    "league": "La Liga",
+    "date": "2025-08-23T17:30:00Z",
+    "home_team": "Club Atlético de Madrid",
+    "away_team": "Elche CF",
+    "status": "TIMED",
+    "source": "Football-Data.org"
+  },
+  {
+    "league": "La Liga",
+    "date": "2025-08-23T19:30:00Z",
+    "home_team": "Levante UD",
+    "away_team": "FC Barcelona",
+    "status": "TIMED",
+    "source": "Football-Data.org"
+  },
+  {
+    "league": "Premier League",
+    "date": "2025-08-23T11:30:00Z",
+    "home_team": "Manchester City FC",
+    "away_team": "Tottenham Hotspur FC",
+    "status": "TIMED",
+    "source": "Football-Data.org"
+  },
+  {
+    "league": "Premier League",
+    "date": "2025-08-23T14:00:00Z",
+    "home_team": "AFC Bournemouth",
+    "away_team": "Wolverhampton Wanderers FC",
+    "status": "TIMED",
+    "source": "Football-Data.org"
+  },
+  {
+    "league": "Premier League",
+    "date": "2025-08-23T14:00:00Z",
+    "home_team": "Brentford FC",
+    "away_team": "Aston Villa FC",
+    "status": "TIMED",
+    "source": "Football-Data.org"
+  },
+  {
+    "league": "Premier League",
+    "date": "2025-08-23T14:00:00Z",
+    "home_team": "Burnley FC",
+    "away_team": "Sunderland AFC",
+    "status": "TIMED",
+    "source": "Football-Data.org"
+  },
+  {
+    "league": "Premier League",
+    "date": "2025-08-23T16:30:00Z",
+    "home_team": "Arsenal FC",
+    "away_team": "Leeds United FC",
+    "status": "TIMED",
+    "source": "Football-Data.org"
+  }
+]

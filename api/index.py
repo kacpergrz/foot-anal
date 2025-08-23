@@ -11,20 +11,16 @@ CORS(app) # Włącz CORS, aby przeglądarka mogła wysyłać zapytania
 # --- Logika z get_matches.py ---
 def _parse_footballdata_org_response(data: dict, league_name: str) -> list:
     matches = []
-    today = date.today()
     for match in data.get('matches', []):
         utc_date_str = match.get('utcDate')
         if not utc_date_str: continue
-        try:
-            match_date = datetime.fromisoformat(utc_date_str.replace('Z', '+00:00')).date()
-            if match_date == today:
-                matches.append({
-                    'league': league_name, 'date': utc_date_str,
-                    'home_team': match.get('homeTeam', {}).get('name', 'N/A'),
-                    'away_team': match.get('awayTeam', {}).get('name', 'N/A'),
-                    'status': match.get('status', 'SCHEDULED'), 'source': 'Football-Data.org'
-                })
-        except (ValueError, TypeError): continue
+        # Filtrowanie po dacie odbywa się teraz w zapytaniu API, więc sprawdzanie daty tutaj nie jest już potrzebne.
+        matches.append({
+            'league': league_name, 'date': utc_date_str,
+            'home_team': match.get('homeTeam', {}).get('name', 'N/A'),
+            'away_team': match.get('awayTeam', {}).get('name', 'N/A'),
+            'status': match.get('status', 'SCHEDULED'), 'source': 'Football-Data.org'
+        })
     return matches
 
 def _parse_openligadb_response(data: list, league_name: str) -> list:
@@ -49,12 +45,14 @@ def get_matches():
     all_matches = []
     session = requests.Session()
     session.headers.update({'User-Agent': 'Vercel-Function-Football-Scraper/1.0'})
+    today_iso = date.today().isoformat()
 
     FOOTBALL_DATA_API_KEY = os.environ.get('FOOTBALL_DATA_API_KEY')
     if FOOTBALL_DATA_API_KEY:
         apis_with_key = {
-            'Premier League': 'https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED',
-            'La Liga': 'https://api.football-data.org/v4/competitions/PD/matches?status=SCHEDULED',
+            # Użyj filtrowania po dacie, aby pobrać wszystkie mecze z danego dnia, niezależnie od statusu.
+            'Premier League': f'https://api.football-data.org/v4/competitions/PL/matches?dateFrom={today_iso}&dateTo={today_iso}',
+            'La Liga': f'https://api.football-data.org/v4/competitions/PD/matches?dateFrom={today_iso}&dateTo={today_iso}',
         }
         headers = {'X-Auth-Token': FOOTBALL_DATA_API_KEY}
         for league_name, api_url in apis_with_key.items():
@@ -65,7 +63,8 @@ def get_matches():
             except Exception as e:
                 print(f"Error fetching {league_name}: {e}")
 
-    apis_no_key = { 'Bundesliga': f"https://api.openligadb.de/getmatchdata/bl1/{date.today().year}" }
+    # Pobierz dane dla bieżącej kolejki zamiast całego sezonu - jest to bardziej wydajne.
+    apis_no_key = { 'Bundesliga': "https://api.openligadb.de/getmatchdata/bl1" }
     for league_name, api_url in apis_no_key.items():
         try:
             response = session.get(api_url)
@@ -73,7 +72,7 @@ def get_matches():
             all_matches.extend(_parse_openligadb_response(response.json(), league_name))
         except Exception as e:
             print(f"Error fetching {league_name}: {e}")
-            
+
     return jsonify(all_matches)
 
 # --- Logika z analyze.py ---
@@ -101,9 +100,11 @@ def analyze():
         return jsonify({"error": "Brak promptu w zapytaniu."}), 400
     if not user_api_key:
         return jsonify({"error": "Brak klucza API w zapytaniu. Upewnij się, że został dodany w ustawieniach."}), 400
-    
+
     try:
         gemini_response = _call_gemini_api(prompt, user_api_key)
         return jsonify(gemini_response)
     except Exception as e:
-        return jsonify({"error": f"Błąd po stronie serwera: {e}"}), 500
+        # Lepszą praktyką jest logowanie szczegółów błędu na serwerze i zwracanie ogólnej wiadomości do klienta.
+        print(f"Server error during Gemini API call: {e}")
+        return jsonify({"error": "Wystąpił błąd po stronie serwera podczas przetwarzania zapytania."}), 500

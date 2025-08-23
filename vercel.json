@@ -1,22 +1,39 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/**/*.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/get_matches.py": {
+      "runtime": "python3.9"
+    },
+    "api/analyze.py": {
+      "runtime": "python3.9"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/get-matches",
-      "dest": "/api/get_matches.py",
-      "headers": {
-        "Cache-Control": "s-maxage=3600, stale-while-revalidate=60"
-      }
+      "source": "/api/get-matches",
+      "destination": "/api/get_matches.py"
     },
     {
-      "src": "/api/analyze",
-      "dest": "/api/analyze.py"
+      "source": "/api/analyze",
+      "destination": "/api/analyze.py"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
     }
   ]
 }

@@ -7,7 +7,7 @@ import json
 try:
     import google.generativeai as genai
     from google.api_core import exceptions as google_exceptions
-    from google.generativeai.types import generation_types
+    from google.generativeai.types import generation_types, Tool
     GOOGLE_AI_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Google AI libraries not available: {e}")
@@ -101,13 +101,62 @@ def _call_perplexity_api(prompt, api_key):
     # Ujednolicamy format odpowiedzi, aby pasował do tego z Gemini
     return {"candidates": [{"content": {"parts": [{"text": text_response}]}}]}
 
-def _call_gemini_api(prompt, api_key):
-    """Komunikuje się z API Gemini używając oficjalnej biblioteki Google."""
+def should_use_grounding(prompt):
+    """Sprawdza czy prompt wymaga aktualnych danych"""
+    keywords = ['dzisiaj', 'obecnie', 'najnowsze', 'aktualne', 'ostatnie mecze', 'dzisiejsze', 'teraz']
+    return any(keyword in prompt.lower() for keyword in keywords)
+
+def _call_gemini_api(prompt, api_key, use_grounding=False):
+    """Komunikuje się z API Gemini z opcjonalnym groundingiem."""
     try:
         genai.configure(api_key=api_key)
-        # Usuwamy instrukcję systemową, aby dać frontendowi pełną kontrolę nad promptem.
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(prompt)
+        
+        # Użyj grounding jeśli włączony przez użytkownika
+        if use_grounding:
+            print("Używam grounding search (włączony przez użytkownika)...")
+            try:
+                # Próbuj nową składnię (v0.3.0+)
+                tools = [{"google_search_retrieval": {}}]
+                model = genai.GenerativeModel('gemini-1.5-flash', tools=tools)
+            except Exception as e:
+                print(f"Błąd z nową składnią grounding: {e}")
+                try:
+                    # Próbuj starszą składnię
+                    model = genai.GenerativeModel(
+                        'gemini-2.0-flash',
+                        tools=[genai.Tool.from_google_search_retrieval(genai.GoogleSearchRetrieval())]
+                    )
+                except Exception as e2:
+                    print(f"Błąd ze starszą składnią grounding: {e2}")
+                    # Fallback - rzuć błąd z sugestią aktualizacji
+                    raise Exception("Grounding search nie jest dostępny. Zaktualizuj bibliotekę google-generativeai do wersji >=0.3.0 lub użyj Perplexity, które ma wbudowane wyszukiwanie internetowe.")
+            
+            # Optymalizacja promptu dla grounding
+            optimized_prompt = f"""
+            {prompt}
+            
+            INSTRUKCJE WYSZUKIWANIA:
+            - Szukaj tylko najważniejszych, aktualnych informacji
+            - Ogranicz się do ostatnich 24 godzin
+            - Skup się na konkretnych faktach, nie opiniach
+            - Bądź zwięzły w odpowiedzi
+            """
+        else:
+            print("Używam standardowego modelu bez grounding...")
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            optimized_prompt = prompt
+
+        # Konfiguracja generowania z timeoutem
+        generation_config = genai.GenerationConfig(
+            max_output_tokens=2000,  # Ograniczenie długości
+            temperature=0.1,         # Mniej kreatywności = szybsza odpowiedź
+        )
+        
+        response = model.generate_content(
+            optimized_prompt,
+            generation_config=generation_config,
+            request_options={"timeout": 45}  # 45 sekund timeout
+        )
 
         if not response.candidates:
             reason = response.prompt_feedback.block_reason.name if response.prompt_feedback.block_reason else "Nieznany"
@@ -115,8 +164,10 @@ def _call_gemini_api(prompt, api_key):
 
         return {"candidates": [{"content": {"parts": [{"text": response.text}]}}]}
 
-    except ValueError as e:
-        raise generation_types.BlockedPromptException(f"Odpowiedź zablokowana lub pusta. {e}")
+    except Exception as e:
+        if "timeout" in str(e).lower():
+            raise Exception("Zapytanie przekroczyło limit czasu. Spróbuj ponownie lub użyj Perplexity.")
+        raise e
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
@@ -132,13 +183,22 @@ def analyze():
         return jsonify({"error": "Brakujące dane w zapytaniu (wymagane: prompt, model)."}), 400
 
     try:
+        print(f"Rozpoczynam analizę z modelem: {model_choice}")
+        
         if model_choice == 'gemini':
             user_api_key = body.get('geminiApiKey')
             if not user_api_key:
                 return jsonify({"error": "Brak klucza API dla Gemini. Upewnij się, że został dodany w ustawieniach."}), 400
             if not GOOGLE_AI_AVAILABLE:
                 return jsonify({"error": "Biblioteki Google AI nie są dostępne. Sprawdź konfigurację serwera."}), 503
-            response_data = _call_gemini_api(prompt, user_api_key)
+            
+            # Sprawdź czy grounding jest włączony przez użytkownika
+            use_grounding = body.get('useGrounding', False)
+            if use_grounding:
+                print("UWAGA: Grounding search włączony - może to potrwać do 60 sekund")
+            
+            response_data = _call_gemini_api(prompt, user_api_key, use_grounding)
+            
         elif model_choice == 'perplexity':
             user_api_key = body.get('perplexityApiKey')
             if not user_api_key:
@@ -146,6 +206,8 @@ def analyze():
             response_data = _call_perplexity_api(prompt, user_api_key)
         else:
             return jsonify({"error": "Nieprawidłowy model. Dostępne opcje: 'gemini', 'perplexity'."}), 400
+            
+        print("Analiza zakończona pomyślnie")
         return jsonify(response_data)
 
     except google_exceptions.PermissionDenied:
@@ -154,6 +216,10 @@ def analyze():
         return jsonify({"error": f"Błąd API Gemini: Nie znaleziono zasobu (np. modelu). Sprawdź poprawność nazwy. Szczegóły: {e}"}), 404
     except google_exceptions.InvalidArgument:
          return jsonify({"error": "Błąd API Gemini: Nieprawidłowy argument, sprawdź poprawność promptu."}), 400
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "Zapytanie przekroczyło limit czasu. Spróbuj ponownie lub użyj Perplexity dla szybszej odpowiedzi."}), 408
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "Błąd połączenia z API. Sprawdź połączenie internetowe i spróbuj ponownie."}), 503
     except requests.exceptions.HTTPError as e:
         if e.response.status_code in [401, 403]:
             return jsonify({"error": "Błąd API Perplexity: Nieprawidłowy klucz API lub brak uprawnień."}), 403
@@ -161,7 +227,13 @@ def analyze():
     except generation_types.BlockedPromptException as e:
         return jsonify({"error": f"Twoje zapytanie zostało zablokowane przez API. {e}"}), 400
     except Exception as e:
-        return jsonify({"error": f"Wystąpił nieoczekiwany błąd serwera: {e}"}), 500
+        error_msg = str(e)
+        if "timeout" in error_msg.lower():
+            return jsonify({"error": "Zapytanie przekroczyło limit czasu. Spróbuj ponownie lub użyj Perplexity dla szybszej odpowiedzi."}), 408
+        elif "failed to fetch" in error_msg.lower():
+            return jsonify({"error": "Błąd połączenia. Sprawdź połączenie internetowe i spróbuj ponownie."}), 503
+        print(f"Nieoczekiwany błąd: {error_msg}")
+        return jsonify({"error": f"Wystąpił nieoczekiwany błąd serwera: {error_msg}"}), 500
 
 @app.errorhandler(500)
 def internal_error(error):

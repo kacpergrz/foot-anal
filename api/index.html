@@ -29,6 +29,23 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        /* Toggle Switch Styles */
+        .toggle-bg {
+            cursor: pointer;
+        }
+        
+        #groundingToggle:checked + .toggle-bg {
+            background-color: #3b82f6;
+        }
+        
+        #groundingToggle:checked + .toggle-bg + .toggle-dot {
+            transform: translateX(20px);
+        }
+        
+        .toggle-dot {
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white antialiased">
@@ -117,6 +134,45 @@
                            class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <p class="text-xs text-gray-400 mt-1">Uzyskaj na: <a href="https://www.perplexity.ai/settings/api" target="_blank" class="text-blue-400">Perplexity AI</a></p>
                 </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Typ analizy</label>
+                    <div class="space-y-2 bg-gray-800 p-3 rounded-lg">
+                        <label class="flex items-center">
+                            <input type="radio" name="analysisType" value="quick" class="mr-2">
+                            <div>
+                                <span class="text-sm">⚡ Szybka analiza</span>
+                                <p class="text-xs text-gray-400">Podstawowe informacje, 5-10 sekund</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="analysisType" value="detailed" class="mr-2" checked>
+                            <div>
+                                <span class="text-sm">📊 Szczegółowa analiza</span>
+                                <p class="text-xs text-gray-400">Profesjonalna analiza ekspercka</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="analysisType" value="betting" class="mr-2">
+                            <div>
+                                <span class="text-sm">💰 Fokus na typy</span>
+                                <p class="text-xs text-gray-400">Głównie prognozy bukmacherskie</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-medium">Wyszukiwanie internetowe (Gemini)</span>
+                            <p class="text-xs text-gray-400 mt-1">Włącza aktualne dane z internetu (wolniejsze, do 60s)</p>
+                        </div>
+                        <div class="relative">
+                            <input type="checkbox" id="groundingToggle" class="sr-only">
+                            <div class="toggle-bg w-11 h-6 bg-gray-600 rounded-full shadow-inner cursor-pointer transition-colors duration-200"></div>
+                            <div class="toggle-dot absolute w-4 h-4 bg-white rounded-full shadow top-1 left-1 transition-transform duration-200"></div>
+                        </div>
+                    </label>
+                </div>
                 <div class="flex space-x-3">
                     <button id="saveSettings" class="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">
                         Zapisz
@@ -135,6 +191,8 @@
         let geminiApiKey = localStorage.getItem('geminiApiKey') || '';
         let perplexityApiKey = localStorage.getItem('perplexityApiKey') || '';
         let selectedModel = localStorage.getItem('selectedAiModel') || 'gemini';
+        let useGrounding = localStorage.getItem('useGrounding') === 'true';
+        let analysisType = localStorage.getItem('analysisType') || 'detailed';
         const converter = new showdown.Converter();
 
         // DOM elements
@@ -146,6 +204,7 @@
         const settingsModal = document.getElementById('settingsModal');
         const geminiApiKeyInput = document.getElementById('geminiApiKeyInput');
         const perplexityApiKeyInput = document.getElementById('perplexityApiKeyInput');
+        const groundingToggle = document.getElementById('groundingToggle');
         const modelButtons = document.querySelectorAll('.model-btn');
 
         // Event listeners
@@ -158,6 +217,20 @@
             btn.addEventListener('click', () => {
                 selectedModel = btn.dataset.model;
                 updateModelButtons();
+            });
+        });
+        
+        // Toggle switch event listener
+        groundingToggle.addEventListener('change', () => {
+            useGrounding = groundingToggle.checked;
+        });
+        
+        // Analysis type radio buttons
+        document.querySelectorAll('input[name="analysisType"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    analysisType = radio.value;
+                }
             });
         });
 
@@ -213,6 +286,96 @@
             `).join('');
         }
 
+        function generatePrompt(match, type) {
+            const baseInfo = `**${match.home_team} vs ${match.away_team}**
+**Liga:** ${match.league}
+**Data:** ${new Date(match.date).toLocaleDateString('pl-PL')}`;
+
+            switch(type) {
+                case 'quick':
+                    return `Przeanalizuj szybko mecz piłkarski:
+
+${baseInfo}
+
+Podaj zwięzłą analizę (max 150 słów) zawierającą:
+- **Przewidywany wynik** z krótkim uzasadnieniem
+- **Kluczowy gracz** każdej drużyny
+- **Główny typ bukmacherski** (1X2)
+
+Odpowiedz w języku polskim, używając markdown.`;
+
+                case 'betting':
+                    return `Jesteś ekspertem bukmacherskim. Przeanalizuj mecz pod kątem typowania:
+
+${baseInfo}
+
+## 💰 ANALIZA BUKMACHERSKA
+
+### Główne typy:
+- **1X2** - przewidywany wynik z oceną pewności (1-10)
+- **Over/Under 2.5** - analiza bramek
+- **Obie drużyny strzelą** - prawdopodobieństwo
+
+### Statystyki kluczowe:
+- **Forma strzelecka** obu drużyn
+- **Bilans bezpośredni** ostatnich spotkań
+- **Motywacja** i znaczenie meczu
+
+### Rekomendacje:
+- **Typ główny** z uzasadnieniem
+- **Typy alternatywne** (niższe ryzyko)
+- **Ocena wartości** kursów
+
+Odpowiedz w języku polskim, używając emotikonów i markdown. Skup się na konkretnych typach.`;
+
+                case 'detailed':
+                default:
+                    return `Jesteś ekspertem analitykiem piłkarskim z 15-letnim doświadczeniem. Przeanalizuj mecz:
+
+${baseInfo}
+
+Wykonaj profesjonalną analizę pre-match uwzględniając:
+
+## 📊 ANALIZA DRUŻYN
+- **Forma ostatnich 5 meczów** (wygrane/remisy/porażki)
+- **Statystyki head-to-head** (ostatnie spotkania)
+- **Pozycja w tabeli** i punkty
+- **Bramki strzelone/stracone** (średnia na mecz)
+
+## ⚽ KLUCZOWI GRACZE
+- **Najlepsi strzelcy** obu drużyn
+- **Kontuzje/zawieszenia** kluczowych graczy
+- **Gracze w formie** (ostatnie występy)
+- **Potencjalne debiuty/powroty**
+
+## 🎯 ANALIZA TAKTYCZNA
+- **Preferowane ustawienia** (4-4-2, 4-3-3, etc.)
+- **Styl gry** (pressing, kontra, posiadanie)
+- **Mocne/słabe strony** każdej drużyny
+- **Przewaga gospodarzy** vs forma gości
+
+## 🌟 CZYNNIKI DECYDUJĄCE
+- **Motywacja** (walka o mistrzostwo/spadek)
+- **Warunki pogodowe** (jeśli istotne)
+- **Presja kibiców** i atmosfera
+- **Znaczenie meczu** w kontekście sezonu
+
+## 🔮 PROGNOZA
+- **Przewidywany wynik** z uzasadnieniem
+- **Prawdopodobny przebieg** meczu
+- **Kluczowe momenty** do obserwowania
+- **Alternatywne scenariusze**
+
+## 💰 TYPY BUKMACHERSKIE
+- **Główny typ** (1X2) z oceną wartości
+- **Typy alternatywne** (over/under, obie drużyny strzelą)
+- **Ocena ryzyka** (niskie/średnie/wysokie)
+- **Uzasadnienie** każdego typu
+
+Odpowiedz w języku polskim, używając emotikonów i formatowania markdown. Bądź konkretny i merytoryczny.`;
+            }
+        }
+
         async function analyzeMatch(index) {
             const isGemini = selectedModel === 'gemini';
             const apiKey = isGemini ? geminiApiKey : perplexityApiKey;
@@ -224,35 +387,50 @@
             }
 
             const match = matches[index];
+            
+            // Generuj prompt w zależności od typu analizy
+            const prompt = generatePrompt(match, analysisType);
+            
+            // Sprawdź czy będzie używany grounding
+            
+            const willUseGrounding = isGemini && useGrounding;
+            
+            const analysisTypeLabels = {
+                'quick': '⚡ Szybka',
+                'detailed': '📊 Szczegółowa', 
+                'betting': '💰 Bukmacherska'
+            };
+            
             analysisPanel.innerHTML = `
                 <div class="text-center py-8">
                     <div class="loader w-8 h-8 border-4 border-gray-600 rounded-full mx-auto mb-4"></div>
                     <p class="text-gray-400">Analizuję mecz ${match.home_team} vs ${match.away_team}...</p>
+                    ${willUseGrounding ? '<p class="text-yellow-400 text-sm mt-2">🌐 Używam wyszukiwania internetowego - może to potrwać do 60 sekund</p>' : ''}
+                    <p class="text-blue-400 text-sm mt-2">Model: ${selectedModel.toUpperCase()}${willUseGrounding ? ' + Internet' : ''}</p>
+                    <p class="text-green-400 text-sm">Typ: ${analysisTypeLabels[analysisType]}</p>
                 </div>
             `;
 
-            const prompt = `Przeanalizuj mecz piłki nożnej: ${match.home_team} vs ${match.away_team} w lidze ${match.league}. 
-            Podaj krótką analizę (max 300 słów) zawierającą:
-            1. Przewidywany wynik
-            2. Kluczowych graczy do obserwowania
-            3. Taktyczne aspekty
-            4. Czynniki mogące wpłynąć na wynik
-            5. Typ bukmacherski
-            
-            Odpowiedz w języku polskim w formacie markdown.`;
-
             const body = {
                 prompt,
-                model: selectedModel
+                model: selectedModel,
+                useGrounding: willUseGrounding
             };
             body[isGemini ? 'geminiApiKey' : 'perplexityApiKey'] = apiKey;
 
             try {
+                // Dodaj timeout dla długich zapytań z grounding
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 sekund timeout
+                
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify(body),
+                    signal: controller.signal
                 });
+                
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     const error = await response.json();
@@ -271,12 +449,27 @@
                 `;
             } catch (error) {
                 console.error('Analysis error:', error);
+                let errorMessage = error.message;
+                
+                if (error.name === 'AbortError') {
+                    errorMessage = 'Zapytanie przekroczyło limit czasu (60s). Spróbuj ponownie lub użyj Perplexity dla szybszej odpowiedzi.';
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'Błąd połączenia. Sprawdź połączenie internetowe i spróbuj ponownie.';
+                }
+                
                 analysisPanel.innerHTML = `
                     <div class="text-red-400 text-center py-8">
-                        <p>Błąd analizy: ${error.message}</p>
-                        <button onclick="analyzeMatch(${index})" class="mt-2 text-blue-400 hover:text-blue-300">
-                            Spróbuj ponownie
-                        </button>
+                        <p>Błąd analizy: ${errorMessage}</p>
+                        <div class="mt-4 space-x-2">
+                            <button onclick="analyzeMatch(${index})" class="text-blue-400 hover:text-blue-300 px-3 py-1 border border-blue-400 rounded">
+                                Spróbuj ponownie
+                            </button>
+                            ${selectedModel === 'gemini' && perplexityApiKey ? `
+                                <button onclick="switchToPerplexity(${index})" class="text-green-400 hover:text-green-300 px-3 py-1 border border-green-400 rounded">
+                                    Użyj Perplexity
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                 `;
             }
@@ -306,6 +499,11 @@
         function openSettings() {
             geminiApiKeyInput.value = geminiApiKey;
             perplexityApiKeyInput.value = perplexityApiKey;
+            groundingToggle.checked = useGrounding;
+            
+            // Ustaw wybrany typ analizy
+            document.querySelector(`input[name="analysisType"][value="${analysisType}"]`).checked = true;
+            
             settingsModal.classList.remove('hidden');
             settingsModal.classList.add('flex');
             updateModelButtons();
@@ -319,10 +517,19 @@
         function saveSettings() {
             geminiApiKey = geminiApiKeyInput.value.trim();
             perplexityApiKey = perplexityApiKeyInput.value.trim();
+            useGrounding = groundingToggle.checked;
+            
+            // Pobierz wybrany typ analizy
+            const selectedAnalysisType = document.querySelector('input[name="analysisType"]:checked');
+            if (selectedAnalysisType) {
+                analysisType = selectedAnalysisType.value;
+            }
             
             localStorage.setItem('geminiApiKey', geminiApiKey);
             localStorage.setItem('perplexityApiKey', perplexityApiKey);
             localStorage.setItem('selectedAiModel', selectedModel);
+            localStorage.setItem('useGrounding', useGrounding.toString());
+            localStorage.setItem('analysisType', analysisType);
 
             closeSettings();
             alert('Ustawienia zapisane.');
@@ -340,6 +547,18 @@
         settingsModal.addEventListener('click', (e) => {
             if (e.target === settingsModal) closeSettings();
         });
+
+        // Switch to Perplexity for faster analysis
+        async function switchToPerplexity(index) {
+            const originalModel = selectedModel;
+            selectedModel = 'perplexity';
+            
+            try {
+                await analyzeMatch(index);
+            } finally {
+                selectedModel = originalModel; // Przywróć oryginalny model
+            }
+        }
     </script>
 </body>
 </html>

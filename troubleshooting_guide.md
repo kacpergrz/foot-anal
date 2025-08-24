@@ -116,6 +116,51 @@ Jeśli nic nie działa:
 
 ---
 
+## 🌐 **GROUNDING SEARCH TROUBLESHOOTING**
+
+### Problem: "module 'google.generativeai' has no attribute 'GoogleSearchRetrieval'"
+
+#### Rozwiązanie 1: Aktualizuj bibliotekę
+```bash
+# Uruchom skrypt aktualizacji
+python update_dependencies.py
+
+# Lub ręcznie:
+pip install --upgrade google-generativeai>=0.3.0
+```
+
+#### Rozwiązanie 2: Sprawdź wersję
+```bash
+pip show google-generativeai
+# Powinna być >= 0.3.0
+```
+
+#### Rozwiązanie 3: Użyj Perplexity jako alternatywy
+- Perplexity ma wbudowane wyszukiwanie internetowe
+- Nie wymaga dodatkowych bibliotek
+- Zawsze aktualne dane
+
+#### Rozwiązanie 4: Wyłącz grounding
+- Idź do Ustawienia → Wyłącz "Wyszukiwanie internetowe"
+- Używaj szybkich analiz bez internetu
+
+### Problem: Grounding search trwa za długo
+
+#### Rozwiązania:
+1. **Użyj Perplexity** - szybsze wyszukiwanie (5-15s)
+2. **Wyłącz grounding** dla szybkich analiz
+3. **Sprawdź połączenie** internetowe
+4. **Poczekaj do 60 sekund** - to normalny czas dla grounding
+
+### Problem: "Failed to fetch" z grounding
+
+#### Przyczyny i rozwiązania:
+- **Timeout** → Zwiększ cierpliwość lub użyj Perplexity
+- **Błąd API** → Sprawdź klucz Gemini API
+- **Połączenie** → Sprawdź internet
+
+---
+
 ## 🎯 **QUICK CHECKLIST**
 
 - [ ] Requirements.txt zawiera wszystkie zależności

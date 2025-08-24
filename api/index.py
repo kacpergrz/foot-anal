@@ -4,6 +4,7 @@ import os
 import requests
 from datetime import date, datetime
 import json
+print("Vercel: api/index.py został załadowany.") # Dodano dla debugowania
 try:
     import google.generativeai as genai
     from google.api_core import exceptions as google_exceptions

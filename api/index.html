@@ -253,11 +253,14 @@
                 
                 // Jeśli klucze są ustawione w środowisku, ukryj inputy i pokaż info
                 if (data.gemini_key_set) {
-                    console.log('Gemini API key znaleziony w środowisku:', data.gemini_key_preview);
+                    console.log('✅ Gemini API key znaleziony w środowisku:', data.gemini_key_preview);
                 }
                 if (data.perplexity_key_set) {
-                    console.log('Perplexity API key znaleziony w środowisku:', data.perplexity_key_preview);
+                    console.log('✅ Perplexity API key znaleziony w środowisku:', data.perplexity_key_preview);
                 }
+                
+                // Pokaż status w interfejsie
+                updateStatusIndicator(data);
                 
                 // Zapisz informacje o kluczach środowiskowych
                 window.envKeys = data;
@@ -265,6 +268,56 @@
             } catch (error) {
                 console.error('Błąd sprawdzania kluczy środowiskowych:', error);
             }
+        }
+
+        function updateStatusIndicator(envKeys) {
+            // Sprawdź dostępność kluczy
+            const geminiAvailable = geminiApiKey || envKeys.gemini_key_set;
+            const perplexityAvailable = perplexityApiKey || envKeys.perplexity_key_set;
+            
+            // Zaktualizuj status w zależności od wybranego modelu
+            let statusMessage = '';
+            let statusClass = '';
+            
+            if (selectedModel === 'gemini') {
+                if (geminiAvailable) {
+                    statusMessage = envKeys.gemini_key_set ? 
+                        '🔑 Gemini (klucz z Vercel env)' : 
+                        '🔑 Gemini (klucz z ustawień)';
+                    statusClass = 'text-green-400';
+                } else {
+                    statusMessage = '❌ Gemini - brak klucza API';
+                    statusClass = 'text-red-400';
+                }
+            } else if (selectedModel === 'perplexity') {
+                if (perplexityAvailable) {
+                    statusMessage = envKeys.perplexity_key_set ? 
+                        '🔑 Perplexity (klucz z Vercel env)' : 
+                        '🔑 Perplexity (klucz z ustawień)';
+                    statusClass = 'text-green-400';
+                } else {
+                    statusMessage = '❌ Perplexity - brak klucza API';
+                    statusClass = 'text-red-400';
+                }
+            }
+            
+            // Znajdź element do aktualizacji (możemy dodać go do header)
+            let apiStatusElement = document.getElementById('apiStatus');
+            if (!apiStatusElement) {
+                // Stwórz element jeśli nie istnieje
+                apiStatusElement = document.createElement('div');
+                apiStatusElement.id = 'apiStatus';
+                apiStatusElement.className = 'text-sm';
+                
+                // Dodaj do header obok przycisku ustawień
+                const headerButtons = document.querySelector('.flex.items-center.space-x-4');
+                if (headerButtons) {
+                    headerButtons.insertBefore(apiStatusElement, headerButtons.firstChild);
+                }
+            }
+            
+            apiStatusElement.textContent = statusMessage;
+            apiStatusElement.className = `text-sm ${statusClass}`;
         }
 
         // Functions
@@ -457,8 +510,11 @@ Odpowiedz w języku polskim, używając emotikonów i formatowania markdown. Bą
             const isGemini = selectedModel === 'gemini';
             const apiKey = isGemini ? geminiApiKey : perplexityApiKey;
             
-            if (!apiKey) {
-                alert(`Proszę najpierw ustawić klucz API dla modelu ${isGemini ? 'Gemini' : 'Perplexity'} w ustawieniach.`);
+            // Sprawdź czy klucz jest dostępny (z frontend lub env)
+            const hasEnvKey = window.envKeys && (isGemini ? window.envKeys.gemini_key_set : window.envKeys.perplexity_key_set);
+            
+            if (!apiKey && !hasEnvKey) {
+                alert(`Proszę najpierw ustawić klucz API dla modelu ${isGemini ? 'Gemini' : 'Perplexity'} w ustawieniach lub w zmiennych środowiskowych Vercel.`);
                 openSettings();
                 return;
             }
@@ -675,6 +731,11 @@ Odpowiedz w języku polskim, używając emotikonów i formatowania markdown. Bą
                 btn.classList.toggle('bg-blue-600', isSelected);
                 btn.classList.toggle('bg-gray-700', !isSelected);
             });
+            
+            // Odśwież status kluczy po zmianie modelu
+            if (window.envKeys) {
+                updateStatusIndicator(window.envKeys);
+            }
         }
 
         // Close modal on outside click
@@ -684,6 +745,15 @@ Odpowiedz w języku polskim, używając emotikonów i formatowania markdown. Bą
 
         // Switch to Perplexity for faster analysis
         async function switchToPerplexity(index) {
+            // Sprawdź czy Perplexity ma klucz (frontend lub env)
+            const hasPerplexityKey = perplexityApiKey || (window.envKeys && window.envKeys.perplexity_key_set);
+            
+            if (!hasPerplexityKey) {
+                alert('Brak klucza API dla Perplexity. Ustaw go w ustawieniach lub zmiennych środowiskowych Vercel.');
+                openSettings();
+                return;
+            }
+            
             const originalModel = selectedModel;
             selectedModel = 'perplexity';
             

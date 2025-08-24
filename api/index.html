@@ -99,10 +99,23 @@
             </div>
             <div class="space-y-4">
                 <div>
+                    <label class="block text-sm font-medium mb-2">Model AI</label>
+                    <div class="flex space-x-2 bg-gray-800 p-1 rounded-lg">
+                        <button data-model="gemini" class="model-btn flex-1 px-3 py-2 text-sm rounded-md transition-colors">Gemini</button>
+                        <button data-model="perplexity" class="model-btn flex-1 px-3 py-2 text-sm rounded-md transition-colors">Perplexity</button>
+                    </div>
+                </div>
+                <div>
                     <label class="block text-sm font-medium mb-2">Klucz API Gemini</label>
-                    <input type="password" id="apiKeyInput" placeholder="Wprowadź klucz API..." 
+                    <input type="password" id="geminiApiKeyInput" placeholder="Wprowadź klucz API Gemini..." 
                            class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <p class="text-xs text-gray-400 mt-1">Potrzebny do analizy AI. Uzyskaj na: <a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-blue-400">Google AI Studio</a></p>
+                    <p class="text-xs text-gray-400 mt-1">Uzyskaj na: <a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-blue-400">Google AI Studio</a></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Klucz API Perplexity</label>
+                    <input type="password" id="perplexityApiKeyInput" placeholder="Wprowadź klucz API Perplexity..." 
+                           class="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <p class="text-xs text-gray-400 mt-1">Uzyskaj na: <a href="https://www.perplexity.ai/settings/api" target="_blank" class="text-blue-400">Perplexity AI</a></p>
                 </div>
                 <div class="flex space-x-3">
                     <button id="saveSettings" class="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">
@@ -119,7 +132,9 @@
     <script>
         // Global variables
         let matches = [];
-        let apiKey = localStorage.getItem('geminiApiKey') || '';
+        let geminiApiKey = localStorage.getItem('geminiApiKey') || '';
+        let perplexityApiKey = localStorage.getItem('perplexityApiKey') || '';
+        let selectedModel = localStorage.getItem('selectedAiModel') || 'gemini';
         const converter = new showdown.Converter();
 
         // DOM elements
@@ -129,7 +144,9 @@
         const matchCount = document.getElementById('matchCount');
         const analysisPanel = document.getElementById('analysisPanel');
         const settingsModal = document.getElementById('settingsModal');
-        const apiKeyInput = document.getElementById('apiKeyInput');
+        const geminiApiKeyInput = document.getElementById('geminiApiKeyInput');
+        const perplexityApiKeyInput = document.getElementById('perplexityApiKeyInput');
+        const modelButtons = document.querySelectorAll('.model-btn');
 
         // Event listeners
         document.getElementById('refreshBtn').addEventListener('click', loadMatches);
@@ -137,11 +154,17 @@
         document.getElementById('closeModal').addEventListener('click', closeSettings);
         document.getElementById('cancelSettings').addEventListener('click', closeSettings);
         document.getElementById('saveSettings').addEventListener('click', saveSettings);
+        modelButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedModel = btn.dataset.model;
+                updateModelButtons();
+            });
+        });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadMatches();
-            if (!apiKey) {
+            if ((selectedModel === 'gemini' && !geminiApiKey) || (selectedModel === 'perplexity' && !perplexityApiKey)) {
                 setTimeout(openSettings, 1000);
             }
         });
@@ -191,7 +214,11 @@
         }
 
         async function analyzeMatch(index) {
+            const isGemini = selectedModel === 'gemini';
+            const apiKey = isGemini ? geminiApiKey : perplexityApiKey;
+            
             if (!apiKey) {
+                alert(`Proszę najpierw ustawić klucz API dla modelu ${isGemini ? 'Gemini' : 'Perplexity'} w ustawieniach.`);
                 openSettings();
                 return;
             }
@@ -214,11 +241,17 @@
             
             Odpowiedz w języku polskim w formacie markdown.`;
 
+            const body = {
+                prompt,
+                model: selectedModel
+            };
+            body[isGemini ? 'geminiApiKey' : 'perplexityApiKey'] = apiKey;
+
             try {
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, apiKey })
+                    body: JSON.stringify(body)
                 });
 
                 if (!response.ok) {
@@ -271,9 +304,11 @@
         }
 
         function openSettings() {
-            apiKeyInput.value = apiKey;
+            geminiApiKeyInput.value = geminiApiKey;
+            perplexityApiKeyInput.value = perplexityApiKey;
             settingsModal.classList.remove('hidden');
             settingsModal.classList.add('flex');
+            updateModelButtons();
         }
 
         function closeSettings() {
@@ -282,12 +317,23 @@
         }
 
         function saveSettings() {
-            const newApiKey = apiKeyInput.value.trim();
-            if (newApiKey) {
-                apiKey = newApiKey;
-                localStorage.setItem('geminiApiKey', apiKey);
-            }
+            geminiApiKey = geminiApiKeyInput.value.trim();
+            perplexityApiKey = perplexityApiKeyInput.value.trim();
+            
+            localStorage.setItem('geminiApiKey', geminiApiKey);
+            localStorage.setItem('perplexityApiKey', perplexityApiKey);
+            localStorage.setItem('selectedAiModel', selectedModel);
+
             closeSettings();
+            alert('Ustawienia zapisane.');
+        }
+
+        function updateModelButtons() {
+            modelButtons.forEach(btn => {
+                const isSelected = btn.dataset.model === selectedModel;
+                btn.classList.toggle('bg-blue-600', isSelected);
+                btn.classList.toggle('bg-gray-700', !isSelected);
+            });
         }
 
         // Close modal on outside click

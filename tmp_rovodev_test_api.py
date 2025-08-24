@@ -2,6 +2,7 @@
 import requests
 import os
 from dotenv import load_dotenv
+from datetime import date
 
 load_dotenv()
 
@@ -18,13 +19,18 @@ def test_football_data_api():
         'Premier League': 'PL',
         'La Liga': 'PD', 
         'Serie A': 'SA',
-        'Bundesliga': 'BL1'
+        'Bundesliga': 'BL1',
+        'Ligue 1': 'FL1',
+        'Primeira Liga': 'PPL'
     }
     
     headers = {'X-Auth-Token': api_key}
+    today = date.today().strftime('%Y-%m-%d')
+    print(f"📅 Pobieranie meczów z dnia: {today}")
     
     for league_name, code in competitions.items():
-        url = f"https://api.football-data.org/v4/competitions/{code}/matches?status=SCHEDULED"
+        # Zmieniamy URL, aby pobierać mecze tylko z dzisiejszego dnia
+        url = f"https://api.football-data.org/v4/competitions/{code}/matches?dateFrom={today}&dateTo={today}"
         print(f"\n🔍 Testowanie {league_name} ({code})...")
         print(f"URL: {url}")
         
@@ -42,8 +48,8 @@ def test_football_data_api():
                     first_match = data['matches'][0]
                     home_team = first_match.get('homeTeam', {}).get('name', 'N/A')
                     away_team = first_match.get('awayTeam', {}).get('name', 'N/A')
-                    date = first_match.get('utcDate', 'N/A')
-                    print(f"   Przykład: {home_team} vs {away_team} ({date})")
+                    match_date = first_match.get('utcDate', 'N/A')
+                    print(f"   Przykład: {home_team} vs {away_team} ({match_date})")
             else:
                 print(f"❌ Błąd {response.status_code}: {response.text}")
                 

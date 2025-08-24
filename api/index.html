@@ -237,10 +237,35 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             loadMatches();
+            checkEnvironmentKeys();
             if ((selectedModel === 'gemini' && !geminiApiKey) || (selectedModel === 'perplexity' && !perplexityApiKey)) {
                 setTimeout(openSettings, 1000);
             }
         });
+
+        // Sprawdź klucze w zmiennych środowiskowych
+        async function checkEnvironmentKeys() {
+            try {
+                const response = await fetch('/api/check-env-keys');
+                const data = await response.json();
+                
+                console.log('Klucze środowiskowe:', data);
+                
+                // Jeśli klucze są ustawione w środowisku, ukryj inputy i pokaż info
+                if (data.gemini_key_set) {
+                    console.log('Gemini API key znaleziony w środowisku:', data.gemini_key_preview);
+                }
+                if (data.perplexity_key_set) {
+                    console.log('Perplexity API key znaleziony w środowisku:', data.perplexity_key_preview);
+                }
+                
+                // Zapisz informacje o kluczach środowiskowych
+                window.envKeys = data;
+                
+            } catch (error) {
+                console.error('Błąd sprawdzania kluczy środowiskowych:', error);
+            }
+        }
 
         // Functions
         async function loadMatches() {
@@ -556,9 +581,66 @@ Odpowiedz w języku polskim, używając emotikonów i formatowania markdown. Bą
             // Ustaw wybrany typ analizy
             document.querySelector(`input[name="analysisType"][value="${analysisType}"]`).checked = true;
             
+            // Pokaż status kluczy środowiskowych
+            updateApiKeyInputs();
+            
             settingsModal.classList.remove('hidden');
             settingsModal.classList.add('flex');
             updateModelButtons();
+        }
+
+        function updateApiKeyInputs() {
+            if (window.envKeys) {
+                // Gemini API Key
+                const geminiContainer = geminiApiKeyInput.parentElement;
+                if (window.envKeys.gemini_key_set) {
+                    geminiApiKeyInput.placeholder = `Klucz ustawiony w Vercel: ${window.envKeys.gemini_key_preview}`;
+                    geminiApiKeyInput.style.backgroundColor = '#065f46';
+                    geminiApiKeyInput.style.borderColor = '#10b981';
+                    
+                    // Dodaj info o środowisku
+                    let envInfo = geminiContainer.querySelector('.env-info');
+                    if (!envInfo) {
+                        envInfo = document.createElement('p');
+                        envInfo.className = 'env-info text-xs text-green-400 mt-1';
+                        envInfo.textContent = '✅ Klucz API ustawiony w zmiennych środowiskowych Vercel';
+                        geminiContainer.appendChild(envInfo);
+                    }
+                } else {
+                    geminiApiKeyInput.placeholder = 'Wprowadź klucz API Gemini...';
+                    geminiApiKeyInput.style.backgroundColor = '';
+                    geminiApiKeyInput.style.borderColor = '';
+                    
+                    // Usuń info o środowisku
+                    const envInfo = geminiContainer.querySelector('.env-info');
+                    if (envInfo) envInfo.remove();
+                }
+
+                // Perplexity API Key
+                const perplexityContainer = perplexityApiKeyInput.parentElement;
+                if (window.envKeys.perplexity_key_set) {
+                    perplexityApiKeyInput.placeholder = `Klucz ustawiony w Vercel: ${window.envKeys.perplexity_key_preview}`;
+                    perplexityApiKeyInput.style.backgroundColor = '#065f46';
+                    perplexityApiKeyInput.style.borderColor = '#10b981';
+                    
+                    // Dodaj info o środowisku
+                    let envInfo = perplexityContainer.querySelector('.env-info');
+                    if (!envInfo) {
+                        envInfo = document.createElement('p');
+                        envInfo.className = 'env-info text-xs text-green-400 mt-1';
+                        envInfo.textContent = '✅ Klucz API ustawiony w zmiennych środowiskowych Vercel';
+                        perplexityContainer.appendChild(envInfo);
+                    }
+                } else {
+                    perplexityApiKeyInput.placeholder = 'Wprowadź klucz API Perplexity...';
+                    perplexityApiKeyInput.style.backgroundColor = '';
+                    perplexityApiKeyInput.style.borderColor = '';
+                    
+                    // Usuń info o środowisku
+                    const envInfo = perplexityContainer.querySelector('.env-info');
+                    if (envInfo) envInfo.remove();
+                }
+            }
         }
 
         function closeSettings() {

@@ -52,6 +52,19 @@ def _parse_footballdata_org_response(data: dict, league_name: str) -> list:
         except (ValueError, TypeError): continue
     return matches
 
+@app.route('/api/check-env-keys', methods=['GET'])
+def check_env_keys():
+    """Sprawdza czy klucze API są ustawione w zmiennych środowiskowych"""
+    gemini_key = os.environ.get('GEMINI_API_KEY')
+    perplexity_key = os.environ.get('PERPLEXITY_API_KEY')
+    
+    return jsonify({
+        'gemini_key_set': bool(gemini_key),
+        'perplexity_key_set': bool(perplexity_key),
+        'gemini_key_preview': gemini_key[:10] + '...' if gemini_key else None,
+        'perplexity_key_preview': perplexity_key[:10] + '...' if perplexity_key else None
+    })
+
 @app.route('/api/get-matches', methods=['GET'])
 def get_matches():
     all_matches = []
@@ -187,9 +200,16 @@ def analyze():
         print(f"Rozpoczynam analizę z modelem: {model_choice}")
         
         if model_choice == 'gemini':
-            user_api_key = body.get('geminiApiKey')
-            if not user_api_key:
-                return jsonify({"error": "Brak klucza API dla Gemini. Upewnij się, że został dodany w ustawieniach."}), 400
+            # Najpierw spróbuj pobrać klucz API z zmiennych środowiskowych Vercel
+            gemini_api_key = os.environ.get('GEMINI_API_KEY')
+            print(f"Backend: GEMINI_API_KEY z env: {'[UKRYTO]' if gemini_api_key else 'Brak'}")
+            
+            if not gemini_api_key:
+                # Jeśli klucz nie jest ustawiony w zmiennych środowiskowych, pobierz go z frontendu
+                gemini_api_key = body.get('geminiApiKey')
+                print(f"Backend: GEMINI_API_KEY z frontendu: {'[UKRYTO]' if gemini_api_key else 'Brak'}")
+                if not gemini_api_key:
+                    return jsonify({"error": "Brak klucza API dla Gemini. Upewnij się, że został dodany w ustawieniach lub w zmiennych środowiskowych Vercel."}), 400
             if not GOOGLE_AI_AVAILABLE:
                 return jsonify({"error": "Biblioteki Google AI nie są dostępne. Sprawdź konfigurację serwera."}), 503
             
@@ -198,7 +218,7 @@ def analyze():
             if use_grounding:
                 print("UWAGA: Grounding search włączony - może to potrwać do 60 sekund")
             
-            response_data = _call_gemini_api(prompt, user_api_key, use_grounding)
+            response_data = _call_gemini_api(prompt, gemini_api_key, use_grounding)
             
         elif model_choice == 'perplexity':
             # Najpierw spróbuj pobrać klucz API z zmiennych środowiskowych Vercel

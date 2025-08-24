@@ -200,10 +200,14 @@ def analyze():
             response_data = _call_gemini_api(prompt, user_api_key, use_grounding)
             
         elif model_choice == 'perplexity':
-            user_api_key = body.get('perplexityApiKey')
-            if not user_api_key:
-                return jsonify({"error": "Brak klucza API dla Perplexity. Upewnij się, że został dodany w ustawieniach."}), 400
-            response_data = _call_perplexity_api(prompt, user_api_key)
+            # Najpierw spróbuj pobrać klucz API z zmiennych środowiskowych Vercel
+            perplexity_api_key = os.environ.get('PERPLEXITY_API_KEY')
+            if not perplexity_api_key:
+                # Jeśli klucz nie jest ustawiony w zmiennych środowiskowych, pobierz go z frontendu
+                perplexity_api_key = body.get('perplexityApiKey')
+                if not perplexity_api_key:
+                    return jsonify({"error": "Brak klucza API dla Perplexity. Upewnij się, że został dodany w ustawieniach lub w zmiennych środowiskowych Vercel."}), 400
+            response_data = _call_perplexity_api(prompt, perplexity_api_key)
         else:
             return jsonify({"error": "Nieprawidłowy model. Dostępne opcje: 'gemini', 'perplexity'."}), 400
             

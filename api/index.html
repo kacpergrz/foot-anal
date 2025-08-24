@@ -291,11 +291,63 @@
 **Liga:** ${match.league}
 **Data:** ${new Date(match.date).toLocaleDateString('pl-PL')}`;
 
+            // Funkcja do generowania źródeł specyficznych dla ligi
+            function getLeagueSpecificSources(league) {
+                const leagueSources = {
+                    'Premier League': '- **premierleague.com** - oficjalne statystyki PL\n- **flashscore.pl/anglia** - wyniki i tabele\n- **skysports.com** - analizy i składy',
+                    'La Liga': '- **laliga.es** - oficjalne dane La Liga\n- **flashscore.pl/hiszpania** - statystyki\n- **marca.com** - hiszpańskie analizy',
+                    'Serie A': '- **legaseriea.it** - oficjalne statystyki\n- **flashscore.pl/wlochy** - wyniki Serie A\n- **gazzetta.it** - włoskie analizy',
+                    'Bundesliga': '- **bundesliga.com** - oficjalne dane\n- **flashscore.pl/niemcy** - statystyki\n- **kicker.de** - niemieckie analizy',
+                    'Ligue 1': '- **ligue1.fr** - oficjalne statystyki\n- **flashscore.pl/francja** - wyniki\n- **lequipe.fr** - francuskie analizy',
+                    'Primeira Liga': '- **ligaportugal.pt** - oficjalne dane\n- **flashscore.pl/portugalia** - statystyki\n- **abola.pt** - portugalskie analizy'
+                };
+                return leagueSources[league] || '- **flashscore.pl** - statystyki i wyniki';
+            }
+
+            // Dodaj instrukcje źródeł w zależności od modelu
+            let sourcesInstruction = '';
+            
+            if (selectedModel === 'perplexity') {
+                sourcesInstruction = `
+
+🔍 **SPRAWDŹ AKTUALNE DANE NA:**
+- **flashscore.pl** - główne statystyki, wyniki, składy, tabele
+- **transfermarkt.pl** - wartości zawodników, transfery, kontuzje
+- **90minut.pl** - polskie analizy i aktualności
+${getLeagueSpecificSources(match.league)}
+
+📊 **KONKRETNE DANE DO SPRAWDZENIA:**
+- **Forma drużyn**: Ostatnie 5 meczów obu zespołów
+- **Head-to-Head**: Statystyki bezpośrednich spotkań
+- **Składy**: Aktualne kontuzje, zawieszenia, prawdopodobne składy
+- **Tabela**: Pozycje, punkty, bilans bramkowy
+- **Strzelcy**: Forma kluczowych zawodników, top scorers
+- **Statystyki domowe/wyjazdowe**: Średnia bramek, procent wygranych
+- **Defensywa**: Clean sheets, stracone bramki
+- **Transfery**: Ostatnie wzmocnienia i ich wpływ na grę
+
+`;
+            } else if (selectedModel === 'gemini' && useGrounding) {
+                sourcesInstruction = `
+
+🔍 **WYSZUKAJ AKTUALNE INFORMACJE O:**
+- Ostatnich wynikach i formie obu drużyn
+- Statystykach head-to-head między zespołami
+- Aktualnych kontuzjach i zawieszeniach zawodników
+- Pozycjach w tabeli i punktach
+- Formie strzeleckiej kluczowych graczy
+- Ostatnich transferach i zmianach w składach
+
+💡 **UWAGA**: Skup się na najnowszych danych z ${new Date().getFullYear()} roku.
+
+`;
+            }
+
             switch(type) {
                 case 'quick':
                     return `Przeanalizuj szybko mecz piłkarski:
 
-${baseInfo}
+${baseInfo}${sourcesInstruction}
 
 Podaj zwięzłą analizę (max 150 słów) zawierającą:
 - **Przewidywany wynik** z krótkim uzasadnieniem
@@ -307,7 +359,7 @@ Odpowiedz w języku polskim, używając markdown.`;
                 case 'betting':
                     return `Jesteś ekspertem bukmacherskim. Przeanalizuj mecz pod kątem typowania:
 
-${baseInfo}
+${baseInfo}${sourcesInstruction}
 
 ## 💰 ANALIZA BUKMACHERSKA
 
@@ -332,7 +384,7 @@ Odpowiedz w języku polskim, używając emotikonów i markdown. Skup się na kon
                 default:
                     return `Jesteś ekspertem analitykiem piłkarskim z 15-letnim doświadczeniem. Przeanalizuj mecz:
 
-${baseInfo}
+${baseInfo}${sourcesInstruction}
 
 Wykonaj profesjonalną analizę pre-match uwzględniając:
 
